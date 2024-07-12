@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import Stats from 'three/addons/libs/stats.module.js';
+import TypeOne from './trees/type-one.js';
+
+
+const stats = new Stats();
+document.body.appendChild( stats.dom )
 
 
 const scene = new THREE.Scene();
@@ -28,24 +34,39 @@ const dlight = new THREE.DirectionalLight( 0xffffff, 0.5 );
 scene.add( dlight );
 
 
-const shape = new THREE.Mesh(
+/* const shape = new THREE.Mesh(
     new THREE.DodecahedronGeometry(),
     new THREE.MeshPhongMaterial()
 );
 
 scene.add( shape );
 
+const shapeQuat = new THREE.Quaternion();
+shapeQuat.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 100); */
+
+
+const treeOne = new TypeOne(new THREE.Vector3(0, 0, 0));
+
+scene.add(treeOne.mesh);
+
 
 const controls = new OrbitControls( camera, renderer.domElement );
 camera.position.set(0, 30, -60)
-controls.target = new THREE.Vector3(0, 0, 0);
+controls.target = new THREE.Vector3(0, 5, 0);
 controls.update();
 
 
-function animate() {
+
+function animate(dt) {
     requestAnimationFrame(animate);
 
+    //shape.applyQuaternion(shapeQuat);
+
     controls.update();
+    stats.update();
+
+    treeOne.tick(dt / 1000);
+
 
     renderer.render( scene, camera );
 }
