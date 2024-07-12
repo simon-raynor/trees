@@ -3,17 +3,20 @@ import BaseTree from "./base.js";
 
 
 const GROW_INTERVAL = 100;
-const H_DIRECTIONS = 3;
+const MAX_SEGMENTS = 100;
 
 export default class TypeOne extends BaseTree {
-    lastGrew = 0;
 
     segments = [];
+    growable = [];
 
-    constructor(position) {
+    constructor(position, branchDirections = 6) {
         super(position);
 
         this.rootSegment = this.createSegement(null, 0);
+        this.rootSegment.grow();
+
+        this.branchDirections = branchDirections;
 
         this.geomBuffer = new THREE.BufferAttribute(new Float32Array(60000), 3);
         this.geometry = new THREE.BufferGeometry();
@@ -24,8 +27,6 @@ export default class TypeOne extends BaseTree {
         );
 
         this.mesh.position.copy(this.position);
-
-        this.grow();
     }
 
     tick(dt) {
@@ -33,54 +34,40 @@ export default class TypeOne extends BaseTree {
         
         BaseTree.prototype.tick.call(this, dt);
 
-        this.lastGrew += dt;
-
-        if (this.lastGrew >= GROW_INTERVAL) {
-            this.lastGrew = 0;
-
-            this.grow();
-        }
-    }
-
-    grow() {
-        if (this.segments.length >= 10000) return;
-        //this.segments.forEach(s => s.grow());
-        for (let i = this.segments.length - 1; i >= 0; i--) {
-            this.segments[i].grow();
-        }
-
-        this.updateGeometry();
-    }
-
-    updateGeometry() {
-        this.segments.forEach(
-            (seg, idx) => {
-                const segGeom = seg.geometry;
-
-                if (segGeom.length) {
-                    const [a, b, c, x, y, z] = segGeom;
-
-                    this.geomBuffer.setXYZ(idx * 2, a, b, c);
-                    this.geomBuffer.setXYZ(1 + (idx * 2), x, y, z);
-                }
-            }
+        this.growable.forEach(
+            g => g.tick(dt)
         );
-
-        this.geomBuffer.needsUpdate = true;
     }
 
     createSegement(fromSegment, direction) {
+        if (this.segments.length > MAX_SEGMENTS) return null;
+
         const segment = new TypeOneSegment(this, fromSegment, direction);
 
         for (let i = 0; i < this.segments.length; i++) {
             if (fuzzyEquals(this.segments[i].position, segment.position)) {
-                return null;
+                return null; // return something truthy so that above/aside checks work
             }
         }
 
         this.segments.push(segment);
+        this.growable.unshift(segment);
 
         return segment;
+    }
+
+    randomHDirection() {
+        return 1 + Math.floor(Math.random() * this.branchDirections * 0.9999);
+    }
+    
+    directionVector(direction) {
+        if (!direction) {
+            return UP;
+        } else {
+            const theta = direction * (Math.PI * 2 / this.branchDirections);
+    
+            return new THREE.Vector3(1, 0, 0).applyAxisAngle(UP, theta);
+        }
     }
 }
 
@@ -88,33 +75,70 @@ export default class TypeOne extends BaseTree {
 const tmpVec3 = new THREE.Vector3();
 
 class TypeOneSegment {
-    above = null;
-    aside = null;
+    age = 0;
+    growAt = 0;
+
+    above;
+    aside;
 
     constructor(tree, root, dir) {
         this.tree = tree;
+        this.idx = tree.segments.length;
+
         this.root = root;
         this.direction = dir;
-        
-        this.x = this.direction + ',' + (this.root?.direction ?? 0);
-        this.y = 1 + (this.root?.x ?? 0);
 
         this.position = this.root
-                    ? root.position.clone().add(directionVector(this.direction))
+                    ? root.position.clone().add(this.tree.directionVector(this.direction))
                     : new THREE.Vector3(0, 0, 0);
         
         this.below = dir ? null : this.root;
+
+        this.growAt = GROW_INTERVAL + Math.round(Math.random() * GROW_INTERVAL);
+    }
+
+    tick(dt) {
+        this.age += dt;
+
+        if (this.age >= this.growAt) {
+            this.growAt += GROW_INTERVAL + Math.round(Math.random() * GROW_INTERVAL);
+            this.grow();
+        }
     }
 
     grow() {
-        // TODO collision detect
-        if (!this.above) {
+        if (this.above && (this.aside || !this.below)) {
+            this.tree.growable.splice(
+                this.tree.growable.indexOf(this),
+                1
+            );
+            return;
+        }
+
+        if (this.above === undefined) {
             this.above = this.tree.createSegement(this, 0);
         } else if (
-            !this.aside
+            this.above !== null
+            && this.aside === undefined
             && !!this.below // don't grow horizontals from first segment
         ) {
-            this.aside = this.tree.createSegement(this, randomHDirection());
+            this.aside = this.tree.createSegement(this, this.tree.randomHDirection());
+        } else {
+            this.aside = true;
+        }
+
+        this.updateGeometry();
+    }
+
+    updateGeometry() {
+        if (this.root) {
+            const [a, b, c] = this.root.position.toArray();
+            const [x, y, z] = this.position.toArray();
+
+            this.tree.geomBuffer.setXYZ(this.idx * 2, a, b, c);
+            this.tree.geomBuffer.setXYZ(1 + (this.idx * 2), x, y, z);
+
+            this.tree.geomBuffer.needsUpdate = true;
         }
     }
 
@@ -133,22 +157,9 @@ class TypeOneSegment {
 }
 
 
-function randomHDirection() {
-    return 1 + Math.floor(Math.random() * H_DIRECTIONS * 0.9999);
-}
 
 
 const UP = new THREE.Vector3(0, 1, 0);
-
-function directionVector(direction) {
-    if (!direction) {
-        return UP;
-    } else {
-        const theta = direction * (Math.PI * 2 / H_DIRECTIONS);
-
-        return new THREE.Vector3(1, 0, 0).applyAxisAngle(UP, theta);
-    }
-}
 
 
 function fuzzyEquals(v1, v2) {
