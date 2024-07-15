@@ -45,10 +45,10 @@ scene.add( dlight );
 
 const trees = [];
 
-const COUNT = 5;
+const COUNT = 7;
 const HCOUNT = Math.floor(COUNT / 2);
 
-const GAP = 10;
+const GAP = 8;
 const HGAP = GAP / 2;
 
 for (let x = -HCOUNT; x <= HCOUNT; x++) {
@@ -59,7 +59,9 @@ for (let x = -HCOUNT; x <= HCOUNT; x++) {
                     (GAP * x) + (HGAP * (0.5 - Math.random())),
                     0,
                     (GAP * y) + (HGAP * (0.5 - Math.random()))
-                )
+                ),
+                6,
+                100 - (Math.max(Math.abs(x), Math.abs(y)) * 90 / HCOUNT)
             )
         );
     }

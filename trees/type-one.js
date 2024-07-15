@@ -3,20 +3,21 @@ import BaseTree from "./base.js";
 
 
 const GROW_INTERVAL = 100;
-const MAX_SEGMENTS = 100;
+const FAILSAFE_MAX_SEGMENTS = 1000;
 
 export default class TypeOne extends BaseTree {
 
     segments = [];
     growable = [];
 
-    constructor(position, branchDirections = 6) {
+    constructor(position, branchDirections = 6, maxSegments = 100) {
         super(position);
+
+        this.branchDirections = branchDirections;
+        this.maxSegments = maxSegments;
 
         this.rootSegment = this.createSegement(null, 0);
         this.rootSegment.grow();
-
-        this.branchDirections = branchDirections;
 
         this.geomBuffer = new THREE.BufferAttribute(new Float32Array(60000), 3);
         this.geometry = new THREE.BufferGeometry();
@@ -40,7 +41,10 @@ export default class TypeOne extends BaseTree {
     }
 
     createSegement(fromSegment, direction) {
-        if (this.segments.length > MAX_SEGMENTS) return null;
+        if (
+            this.segments.length > this.maxSegments
+            || this.segments.length > FAILSAFE_MAX_SEGMENTS
+        ) return null;
 
         const segment = new TypeOneSegment(this, fromSegment, direction);
 
